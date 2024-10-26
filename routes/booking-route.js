@@ -1,6 +1,6 @@
 import express from "express";
 import { verifyToken } from "../middleware/jwt.js";
-import { getCards, intent, confirm } from "../controllers/cards.controller.js";
+import { getCards, intent, confirm } from "../controllers/cards-controller.js";
 
 const router = express.Router();
 

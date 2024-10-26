@@ -4,7 +4,7 @@ import {
   deleteCard,
   getCard,
   getCards
-} from "../controllers/card.controller.js";
+} from "../controllers/card-controller.js";
 import { verifyToken } from "../middleware/jwt.js";
 
 const router = express.Router();
