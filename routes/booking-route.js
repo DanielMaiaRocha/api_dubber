@@ -1,12 +1,17 @@
 import express from "express";
 import { verifyToken } from "../middleware/jwt.js";
-import { getCards, intent, confirm } from "../controllers/cards-controller.js";
+import {
+  createBooking,
+  respondToBooking,
+  confirmBooking,
+} from "../controllers/booking-controller.js";
 
 const router = express.Router();
 
-// router.post("/:gigId", verifyToken, createCards);
-router.get("/", verifyToken, getCards);
-router.post("/create-payment-intent/:id", verifyToken, intent);
-router.put("/", verifyToken, confirm);
+router.post("/:id", verifyToken, createBooking);
+
+router.put("/respond", verifyToken, respondToBooking);
+
+router.put("/confirm", verifyToken, confirmBooking);
 
 export default router;

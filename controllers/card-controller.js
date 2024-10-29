@@ -8,7 +8,7 @@ export const createCardController = async (req, res, next) => {
 
   const newCard = {
     userId: req.userId,
-    ...req.body,
+    ...req.body,bb
   };
 
   try {
