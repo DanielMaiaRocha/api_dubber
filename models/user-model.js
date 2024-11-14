@@ -7,7 +7,7 @@ dotenv.config();
 const client = new Client({
   connectionString: process.env.DB_URL,
   ssl: {
-    rejectUnauthorized: false,  
+    rejectUnauthorized: false,
   },
 });
 
@@ -15,7 +15,7 @@ async function connectToDatabase() {
   try {
     await client.connect();
     console.log('Conectado ao NeonDB com sucesso!');
-    await createTable();  
+    await createTable();
   } catch (err) {
     console.error('Erro ao conectar ao banco de dados', err);
   }
@@ -60,7 +60,7 @@ async function createUser(userData) {
     userData.country,
     userData.phone,
     userData.description,
-    userData.isSeller
+    userData.isSeller,
   ];
 
   try {
@@ -83,4 +83,26 @@ async function getUsers() {
   }
 }
 
-export { connectToDatabase, createUser, getUsers };
+async function getUserById(userId) {
+  const query = 'SELECT * FROM users WHERE id = $1';
+  try {
+    const res = await client.query(query, [userId]);
+    return res.rows[0];
+  } catch (err) {
+    console.error('Erro ao obter usuário por ID:', err);
+    throw err;
+  }
+}
+
+async function getUserByEmail(email) {
+  const query = 'SELECT * FROM users WHERE email = $1';
+  try {
+    const res = await client.query(query, [email]);
+    return res.rows[0];
+  } catch (err) {
+    console.error('Erro ao obter usuário por e-mail:', err);
+    throw err;
+  }
+}
+
+export { connectToDatabase, createUser, getUsers, getUserById, getUserByEmail };

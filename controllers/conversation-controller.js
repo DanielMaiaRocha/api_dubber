@@ -1,5 +1,5 @@
 import createError from "../utils/create-error.js";
-import { createConversation, getConversationById, updateConversationReadStatus } from "../models/conversation-model.js";
+import { createConversation, getConversationById, updateConversation } from "../models/conversation-model.js";
 
 export const createNewConversation = async (req, res, next) => {
   const newConversationData = {
@@ -20,7 +20,7 @@ export const createNewConversation = async (req, res, next) => {
 
 export const updateConversationStatus = async (req, res, next) => {
   try {
-    const updatedConversation = await updateConversationReadStatus(
+    const updatedConversation = await updateConversation(
       req.params.id,
       req.isSeller ? true : undefined,
       req.isSeller ? undefined : true

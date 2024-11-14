@@ -1,4 +1,4 @@
-import createError from "../utils/createError.js";
+import createError from "../utils/create-error.js";
 import { createReview, getReviewsByCard } from "../models/review-model.js";
 import { updateCardStarsInDB } from "../models/card-model.js";  
 
@@ -63,10 +63,5 @@ export const getReviewsController = async (req, res, next) => {
   }
 };
 
-export const deleteReviewController = async (req, res, next) => {
-  try {
 
-  } catch (err) {
-    next(err);
-  }
-};
+export { createReview, getReviewsByCard };

@@ -1,25 +1,25 @@
-import { createError } from "../utils/create-error.js";
-import { createCard, deleteCardById, getCardById, getAllCards } from "../models/card-model.js";
+import createError from "../utils/create-error.js";
+import { createCard as createCardModel, deleteCardById, getCardById, getAllCards } from "../models/card-model.js";
 
-export const createCardController = async (req, res, next) => {
+export const createCard = async (req, res, next) => {
   if (!req.isSeller) {
     return next(createError(403, "Only sellers can create a card!"));
   }
 
   const newCard = {
     userId: req.userId,
-    ...req.body,bb
+    ...req.body,
   };
 
   try {
-    const savedCard = await createCard(newCard);
+    const savedCard = await createCardModel(newCard); // Usando a função renomeada aqui
     res.status(201).json(savedCard);
   } catch (err) {
     next(err);
   }
 };
 
-export const deleteCardController = async (req, res, next) => {
+export const deleteCard = async (req, res, next) => {
   try {
     const card = await getCardById(req.params.id);
     if (!card) return next(createError(404, "Card not found!"));
@@ -34,7 +34,7 @@ export const deleteCardController = async (req, res, next) => {
   }
 };
 
-export const getCardController = async (req, res, next) => {
+export const getCard = async (req, res, next) => {
   try {
     const card = await getCardById(req.params.id);
     if (!card) return next(createError(404, "Card not found!"));
@@ -44,13 +44,13 @@ export const getCardController = async (req, res, next) => {
   }
 };
 
-export const getCardsController = async (req, res, next) => {
+export const getCards = async (req, res, next) => {
   const q = req.query;
   const filters = {
     ...(q.userId && { user_id: q.userId }),
-    ...(q.cat && { cat: q.cat }),
-    ...(q.min && { price: { $gt: q.min } }),
-    ...(q.max && { price: { $lt: q.max } }),
+    ...(q.cat && { category: q.cat }),
+    ...(q.min && { price: { $gte: q.min } }),
+    ...(q.max && { price: { $lte: q.max } }),
     ...(q.search && { title: `%${q.search}%` }),
   };
 

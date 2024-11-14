@@ -41,7 +41,7 @@ async function createTable() {
   }
 }
 
-async function createMessage(messageData) {
+async function createMessages(messageData) {
   const query = `
     INSERT INTO messages (conversationId, userId, description)
     VALUES ($1, $2, $3)
@@ -50,7 +50,7 @@ async function createMessage(messageData) {
   const values = [
     messageData.conversationId,
     messageData.userId,
-    messageData.desc
+    messageData.desc,
   ];
 
   try {
@@ -62,10 +62,10 @@ async function createMessage(messageData) {
   }
 }
 
-async function getMessages() {
-  const query = 'SELECT * FROM messages;';
+async function getMessagesByConversationId(conversationId) {
+  const query = 'SELECT * FROM messages WHERE conversationId = $1;';
   try {
-    const res = await client.query(query);
+    const res = await client.query(query, [conversationId]);
     return res.rows;
   } catch (err) {
     console.error('Erro ao obter mensagens:', err);
@@ -73,4 +73,4 @@ async function getMessages() {
   }
 }
 
-export { connectToDatabase, createMessage, getMessages };
+export { connectToDatabase, createMessages, getMessagesByConversationId };
