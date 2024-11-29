@@ -1,67 +1,53 @@
 import createError from "../utils/create-error.js";
-import { createReview, getReviewsByCard } from "../models/review-model.js";
-import { updateCardStarsInDB } from "../models/card-model.js";  
+import Review from "../models/review-model.js";
+import Gig from "../models/card-model.js";
 
-async function updateCardStars(cardId, star) {
-  try {
-    
-    const card = await updateCardStarsInDB(cardId);
-    
-    if (!card) throw createError(404, "Card not found!");
-
-    
-    const newTotalStars = card.total_stars + star;
-    const newStarNumber = card.star_number + 1;
-
-  
-    await updateCardStarsInDB(cardId, newTotalStars, newStarNumber);
-  } catch (err) {
-    throw new Error("Error updating card stars and review count: " + err.message);
-  }
-}
-
-export const createReviewController = async (req, res, next) => {
+export const createReview = async (req, res, next) => {
   if (req.isSeller)
     return next(createError(403, "Sellers can't create a review!"));
 
-  const reviewData = {
+  const newReview = new Review({
     userId: req.userId,
-    cardId: req.body.cardId,
+    gigId: req.body.gigId,
     desc: req.body.desc,
     star: req.body.star,
-  };
+  });
 
   try {
-   
-    const existingReviews = await getReviewsByCard(req.body.cardId);
-    const userReview = existingReviews.find(
-      (review) => review.user_id === req.userId
-    );
-    
-    if (userReview) {
-      return next(createError(403, "You have already created a review for this card!"));
-    }
+    const review = await Review.findOne({
+      gigId: req.body.gigId,
+      userId: req.userId,
+    });
 
-  
-    const savedReview = await createReview(reviewData);
+    if (review)
+      return next(
+        createError(403, "You have already created a review for this gig!")
+      );
 
-   
-    await updateCardStars(req.body.cardId, req.body.star);
 
+
+    const savedReview = await newReview.save();
+
+    await Gig.findByIdAndUpdate(req.body.gigId, {
+      $inc: { totalStars: req.body.star, starNumber: 1 },
+    });
     res.status(201).send(savedReview);
   } catch (err) {
     next(err);
   }
 };
 
-export const getReviewsController = async (req, res, next) => {
+export const getReviews = async (req, res, next) => {
   try {
-    const reviews = await getReviewsByCard(req.params.cardId);
+    const reviews = await Review.find({ gigId: req.params.gigId });
     res.status(200).send(reviews);
   } catch (err) {
     next(err);
   }
 };
-
-
-export { createReview, getReviewsByCard };
+export const deleteReview = async (req, res, next) => {
+  try {
+  } catch (err) {
+    next(err);
+  }
+};

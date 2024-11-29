@@ -1,29 +1,35 @@
 import createError from "../utils/create-error.js";
-import { createConversation, getConversationById, updateConversation } from "../models/conversation-model.js";
+import Conversation from "../models/conversation-model.js";
 
-export const createNewConversation = async (req, res, next) => {
-  const newConversationData = {
+export const createConversation = async (req, res, next) => {
+  const newConversation = new Conversation({
     id: req.isSeller ? req.userId + req.body.to : req.body.to + req.userId,
     sellerId: req.isSeller ? req.userId : req.body.to,
     buyerId: req.isSeller ? req.body.to : req.userId,
     readBySeller: req.isSeller,
     readByBuyer: !req.isSeller,
-  };
+  });
 
   try {
-    const savedConversation = await createConversation(newConversationData);
+    const savedConversation = await newConversation.save();
     res.status(201).send(savedConversation);
   } catch (err) {
     next(err);
   }
 };
 
-export const updateConversationStatus = async (req, res, next) => {
+export const updateConversation = async (req, res, next) => {
   try {
-    const updatedConversation = await updateConversation(
-      req.params.id,
-      req.isSeller ? true : undefined,
-      req.isSeller ? undefined : true
+    const updatedConversation = await Conversation.findOneAndUpdate(
+      { id: req.params.id },
+      {
+        $set: {
+          // readBySeller: true,
+          // readByBuyer: true,
+          ...(req.isSeller ? { readBySeller: true } : { readByBuyer: true }),
+        },
+      },
+      { new: true }
     );
 
     res.status(200).send(updatedConversation);
@@ -34,7 +40,7 @@ export const updateConversationStatus = async (req, res, next) => {
 
 export const getSingleConversation = async (req, res, next) => {
   try {
-    const conversation = await getConversationById(req.params.id);
+    const conversation = await Conversation.findOne({ id: req.params.id });
     if (!conversation) return next(createError(404, "Not found!"));
     res.status(200).send(conversation);
   } catch (err) {
@@ -42,10 +48,11 @@ export const getSingleConversation = async (req, res, next) => {
   }
 };
 
-export const getUserConversations = async (req, res, next) => {
-  const query = req.isSeller ? { sellerId: req.userId } : { buyerId: req.userId };
+export const getConversations = async (req, res, next) => {
   try {
-    const conversations = await getConversations(query);
+    const conversations = await Conversation.find(
+      req.isSeller ? { sellerId: req.userId } : { buyerId: req.userId }
+    ).sort({ updatedAt: -1 });
     res.status(200).send(conversations);
   } catch (err) {
     next(err);

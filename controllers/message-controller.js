@@ -1,38 +1,37 @@
-import { createMessages, getMessagesByConversationId } from '../models/message-model.js';
-import { updateConversation } from '../models/conversation-model.js'; 
-import createError from '../utils/create-error.js';
+import createError from "../utils/create-error.js";
+import Message from "../models/message-model.js";
+import Conversation from "../models/conversation-model.js";
 
 export const createMessage = async (req, res, next) => {
-  const { conversationId, desc } = req.body;
-  const userId = req.userId; 
-  const isSeller = req.isSeller; 
-
+  const newMessage = new Message({
+    conversationId: req.body.conversationId,
+    userId: req.userId,
+    desc: req.body.desc,
+  });
   try {
-    const newMessage = await createMessages({
-      conversationId,
-      userId,
-      desc,
-    });
+    const savedMessage = await newMessage.save();
+    await Conversation.findOneAndUpdate(
+      { id: req.body.conversationId },
+      {
+        $set: {
+          readBySeller: req.isSeller,
+          readByBuyer: !req.isSeller,
+          lastMessage: req.body.desc,
+        },
+      },
+      { new: true }
+    );
 
-    await updateConversation(conversationId, {
-      readBySeller: isSeller,
-      readByBuyer: !isSeller,
-      lastMessage: desc,
-    });
-
-    res.status(201).json(newMessage);
+    res.status(201).send(savedMessage);
   } catch (err) {
-    next(createError(500, 'Erro ao criar mensagem.'));
+    next(err);
   }
 };
-
 export const getMessages = async (req, res, next) => {
-  const conversationId = req.params.id;
-
   try {
-    const messages = await getMessagesByConversationId(conversationId);
-    res.status(200).json(messages);
+    const messages = await Message.find({ conversationId: req.params.id });
+    res.status(200).send(messages);
   } catch (err) {
-    next(createError(500, 'Erro ao obter mensagens.'));
+    next(err);
   }
 };
