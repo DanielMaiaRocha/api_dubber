@@ -23,10 +23,6 @@ const GigSchema = new Schema(
       type: Number,
       default: 0,
     },
-    cat: {
-      type: String,
-      required: true,
-    },
     price: {
       type: Number,
       required: true,
@@ -35,37 +31,30 @@ const GigSchema = new Schema(
       type: String,
       required: true,
     },
-    images: {
-      type: [String],
-      required: false,
-    },
-    userId: {
-      type: String,
-      required: true,
-    },
-    shortTitle: {
-      type: String,
-      required: true,
-    },
     shortDesc: {
       type: String,
       required: true,
     },
-    deliveryTime: {
-      type: Number,
-      required: true,
-    },
     revisionNumber: {
       type: Number,
-      required: true,
+      required: false,
     },
     features: {
       type: [String],
       required: false,
     },
-    sales: {
-      type: Number,
-      default: 0,
+    lang: {
+      type: String,
+      required: true, 
+    },
+    country: {
+      type: String,
+      required: true, 
+    },
+    role: {
+      type: String,
+      enum: ["Dubbing Actor", "Translator", "Dubbing Director","Project Manager", "Dubbing Operator"], 
+      required: true,
     },
   },
   {
