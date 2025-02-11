@@ -3,11 +3,12 @@ import {
   createMessage,
   getMessages,
 } from "../controllers/message-controller.js";
-import { verifyToken } from "../middleware/jwt.js";
+import { protectRoute } from "../middleware/jwt.js";
+
 
 const router = express.Router();
 
-router.post("/", verifyToken, createMessage);
-router.get("/:id", verifyToken, getMessages);
+router.post("/", protectRoute, createMessage);
+router.get("/:id", protectRoute, getMessages);
 
 export default router;

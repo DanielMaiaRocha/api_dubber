@@ -52,8 +52,8 @@ const GigSchema = new Schema(
       required: true, 
     },
     role: {
-      type: String,
-      enum: ["Dubbing Actor", "Translator", "Dubbing Director","Project Manager", "Dubbing Operator"], 
+      type: mongoose.Schema.Types.ObjectId,
+      ref:"User",
       required: true,
     },
   },

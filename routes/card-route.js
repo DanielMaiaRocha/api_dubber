@@ -5,12 +5,13 @@ import {
   getGig,
   getGigs
 } from "../controllers/card-controller.js";
-import { verifyToken } from "../middleware/jwt.js";
+import { protectRoute } from "../middleware/jwt.js";
+
 
 const router = express.Router();
 
-router.post("/", verifyToken, createGig);
-router.delete("/:id", verifyToken, deleteGig);
+router.post("/", protectRoute, createGig);
+router.delete("/:id", protectRoute, deleteGig);
 router.get("/single/:id", getGig);
 router.get("/", getGigs);
 

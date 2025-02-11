@@ -1,69 +1,189 @@
+import { redis } from "../lib/redis.js";
 import User from "../models/user-model.js";
-import createError from "../utils/create-error.js";
-import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-export const register = async (req, res, next) => {
+const generateTokens = (userId) => {
+  const acessToken = jwt.sign({ userId }, process.env.ACESS_TOKEN_SCT, {
+    expiresIn: "15m",
+  });
+
+  const refreshToken = jwt.sign({ userId }, process.env.REFRESH_TOKEN_SCT, {
+    expiresIn: "7d",
+  });
+
+  return { acessToken, refreshToken };
+};
+
+const storeRefreshToken = async (userId, refreshToken) => {
+  await redis.set(
+    `refresh_token:${userId}`,
+    refreshToken,
+    "EX",
+    7 * 24 * 60 * 60
+  ); // 7 days
+};
+
+const setCookies = (res, acessToken, refreshToken) => {
+  res.cookie("acessToken", acessToken, {
+    httpOnly: true, // prevencao contra XSS
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict", // prevencao contra CSRF
+    maxAge: 15 * 60 * 1000, // 15 min
+  });
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true, // prevencao contra XSS
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict", // prevencao contra CSRF
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 15 min
+  });
+};
+
+export const signup = async (req, res) => {
+  const { email, password, name, isSeller, country, lang } = req.body;
   try {
-    const existingUser = await User.findOne({ email: req.body.email });
-    if (existingUser) return next(createError(400, "Email already in use"));
+    const userExists = await User.findOne({ email });
 
-    const existingUsername = await User.findOne({ username: req.body.username });
-    if (existingUsername) return next(createError(400, "Username already in use"));
+    if (userExists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+    const user = await User.create({ name, email, password, isSeller, country, lang });
 
-    const hash = bcrypt.hashSync(req.body.password, 5);
+    const { acessToken, refreshToken } = generateTokens(user._id);
+    await storeRefreshToken(user._id, refreshToken);
 
-    const newUser = new User({
-      ...req.body,
-      password: hash,
+    setCookies(res, acessToken, refreshToken);
+
+    res.status(201).json({
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        isSeller: user.isSeller,
+        country: user.country,
+        lang: user.lang
+      },
+    
     });
+  } catch (error) {
+    console.log("Error in signup controller", error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
 
-    await newUser.save();
+    if (user && (await user.comparePassword(password))) {
+      const { acessToken, refreshToken } = generateTokens(user._id);
 
-    const { password, ...userInfo } = newUser._doc;
-    res.status(201).json(userInfo);
-  } catch (err) {
-    next(err);
+      await storeRefreshToken(user._id, refreshToken);
+      setCookies(res, acessToken, refreshToken);
+
+      res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        isSeller: user.isSeller,
+        country: user.country,
+        lang: user.lang
+      });
+    }
+    else {
+        res.status(401).json({message:"Invalid email or password"})
+    }
+  } catch (error) {
+    console.log("Error in login controller", error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+export const logout = async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+    if (refreshToken) {
+      const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SCT);
+      await redis.del(`refresh_token:${decoded.userId}`);
+    }
+
+    res.clearCookie("acessToken");
+    res.clearCookie("refreshToken");
+    res.json({ message: "Logged out successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-export const login = async (req, res, next) => {
+export const refreshToken = async (req, res) => {
+    try {
+        const refreshToken = req.cookies.refreshToken;
+
+        if (!refreshToken) {
+            return res.status(401).json({message: "No refresh token provided"})
+        }
+
+        const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SCT)
+        const storedToken = await redis.get(`refresh_token:${decoded.userId}`)
+        
+        if(storedToken !== refreshToken) {
+            return res.status(401).json({message:"Invalid refresh Token"})
+        }
+
+        const acessToken = jwt.sign({userId: decoded.userId}, process.env.ACESS_TOKEN_SCT, {expiresIn: "15m"});
+
+        res.cookie("acesstoken", acessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            maxAge: 15 * 60 * 1000,
+        })
+
+        res.json({message: "Token refreshed successfully" })
+    } catch (error) {
+        console.log("Error in refreshToken controller", error.message)
+        res.status(500).json({message: "Server error", error: error.message })
+    }
+}
+
+export const getProfile = async (req, res) => {
+	try {
+		res.json(req.user);
+	} catch (error) {
+		res.status(500).json({ message: "Server error", error: error.message });
+	}
+};
+
+export const updateProfile = async (req, res) => {
+  const { name, country, lang, profilePic } = req.body;
+
   try {
-    const user = await User.findOne({ username: req.body.username });
+    // Verifica se o usuário está autenticado
+    const userId = req.user._id;
 
-    if (!user) return next(createError(404, "User not found!"));
-
-    const isCorrect = bcrypt.compareSync(req.body.password, user.password);
-    if (!isCorrect) return next(createError(400, "Wrong password or username!"));
-
-    const token = jwt.sign(
-      {
-        id: user._id,
-        isSeller: user.isSeller,
-      },
-      process.env.JWT_KEY
+   
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { name, country, lang, profilePic },
+      { new: true, runValidators: true } 
     );
 
-    const { password, ...info } = user._doc;
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    res
-      .cookie("accessToken", token, {
-        httpOnly: true,
-        secure: true,
-      })
-      .status(200)
-      .json(info);
-  } catch (err) {
-    next(err);
+    res.status(200).json({
+      message: "Profile updated successfully",
+      user: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        isSeller: updatedUser.isSeller,
+        country: updatedUser.country,
+        lang: updatedUser.lang,
+        profilePic: updatedUser.profilePic,
+      },
+    });
+  } catch (error) {
+    console.error("Error in updateProfile controller", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
-};
-
-export const logout = async (req, res) => {
-  res
-    .clearCookie("accessToken", {
-      sameSite: "none",
-      secure: true,
-    })
-    .status(200)
-    .send("User has been logged out.");
 };
