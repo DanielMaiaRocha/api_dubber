@@ -149,7 +149,7 @@ export const refreshToken = async (req, res) => {
           { expiresIn: "15m" }
       );
 
-      res.cookie("accessToken", acessToken, { //  Nome corrigido
+      res.cookie("acessToken", acessToken, { //  Nome corrigido
           httpOnly: true,
           secure: true, //  Garante que só será enviado em HTTPS
           sameSite: "None", //  Necessário para cookies em domínios diferentes (CORS)
