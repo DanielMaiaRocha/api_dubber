@@ -129,7 +129,7 @@ export const logout = async (req, res) => {
 export const refreshToken = async (req, res) => {
   try {
       const refreshToken = req.cookies.refreshToken;
-      console.log("Refresh Token recebido:", refreshToken); // 🔥 Log para debug
+      console.log("Refresh Token recebido:", refreshToken); // Log para debug
 
       if (!refreshToken) {
           return res.status(401).json({ message: "No refresh token provided" });
@@ -137,7 +137,7 @@ export const refreshToken = async (req, res) => {
 
       const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SCT);
       const storedToken = await redis.get(`refresh_token:${decoded.userId}`);
-      console.log("Stored Refresh Token no Redis:", storedToken); // 🔥 Verifica o Redis
+      console.log("Stored Refresh Token no Redis:", storedToken); // Verifica o Redis
 
       if (!storedToken || storedToken !== refreshToken) {
           return res.status(401).json({ message: "Invalid refresh token" });
@@ -149,10 +149,10 @@ export const refreshToken = async (req, res) => {
           { expiresIn: "15m" }
       );
 
-      res.cookie("accessToken", acessToken, { // 🔥 Nome corrigido
+      res.cookie("accessToken", acessToken, { //  Nome corrigido
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
+          secure: true, //  Garante que só será enviado em HTTPS
+          sameSite: "None", //  Necessário para cookies em domínios diferentes (CORS)
           maxAge: 15 * 60 * 1000,
       });
 
@@ -162,7 +162,6 @@ export const refreshToken = async (req, res) => {
       res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 export const getProfile = async (req, res) => {
 	try {
