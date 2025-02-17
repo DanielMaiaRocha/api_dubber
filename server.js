@@ -25,7 +25,7 @@ const connect = async () => {
 };
 
 // Configuração do CORS
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: "https://dubber-nine.vercel.app", credentials: true }));
 
 // Aumentar limite de requisição para suportar arquivos grandes
 app.use(express.json({ limit: "100mb" }));
