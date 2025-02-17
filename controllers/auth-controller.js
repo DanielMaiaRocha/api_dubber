@@ -24,18 +24,31 @@ const storeRefreshToken = async (userId, refreshToken) => {
 };
 
 const setCookies = (res, acessToken, refreshToken) => {
+  if (!acessToken || !refreshToken) {
+    console.error("Tokens inválidos ao definir cookies");
+    return;
+  }
+
+  const cookieOptions = {
+    httpOnly: true, // Prevenção contra ataques XSS
+    secure: process.env.NODE_ENV === "production", // Apenas HTTPS em produção
+    sameSite: "lax", // Prevenção contra CSRF
+    path: "/", // Disponível em toda a aplicação
+  };
+
+  // Define o cookie do access token (expira em 15 min)
   res.cookie("acessToken", acessToken, {
-    httpOnly: true, // prevencao contra XSS
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict", // prevencao contra CSRF
-    maxAge: 15 * 60 * 1000, // 15 min
+    ...cookieOptions,
+    maxAge: 15 * 60 * 1000, // 15 minutos
   });
+
+  // Define o cookie do refresh token (expira em 7 dias)
   res.cookie("refreshToken", refreshToken, {
-    httpOnly: true, // prevencao contra XSS
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict", // prevencao contra CSRF
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 15 min
+    ...cookieOptions,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
   });
+
+  console.log("Cookies definidos com sucesso!");
 };
 
 export const signup = async (req, res) => {
