@@ -127,35 +127,42 @@ export const logout = async (req, res) => {
 };
 
 export const refreshToken = async (req, res) => {
-    try {
-        const refreshToken = req.cookies.refreshToken;
+  try {
+      const refreshToken = req.cookies.refreshToken;
+      console.log("Refresh Token recebido:", refreshToken); // 🔥 Log para debug
 
-        if (!refreshToken) {
-            return res.status(401).json({message: "No refresh token provided"})
-        }
+      if (!refreshToken) {
+          return res.status(401).json({ message: "No refresh token provided" });
+      }
 
-        const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SCT)
-        const storedToken = await redis.get(`refresh_token:${decoded.userId}`)
-        
-        if(storedToken !== refreshToken) {
-            return res.status(401).json({message:"Invalid refresh Token"})
-        }
+      const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SCT);
+      const storedToken = await redis.get(`refresh_token:${decoded.userId}`);
+      console.log("Stored Refresh Token no Redis:", storedToken); // 🔥 Verifica o Redis
 
-        const acessToken = jwt.sign({userId: decoded.userId}, process.env.ACESS_TOKEN_SCT, {expiresIn: "15m"});
+      if (!storedToken || storedToken !== refreshToken) {
+          return res.status(401).json({ message: "Invalid refresh token" });
+      }
 
-        res.cookie("acesstoken", acessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
-            maxAge: 15 * 60 * 1000,
-        })
+      const acessToken = jwt.sign(
+          { userId: decoded.userId },
+          process.env.ACESS_TOKEN_SCT,
+          { expiresIn: "15m" }
+      );
 
-        res.json({message: "Token refreshed successfully" })
-    } catch (error) {
-        console.log("Error in refreshToken controller", error.message)
-        res.status(500).json({message: "Server error", error: error.message })
-    }
-}
+      res.cookie("accessToken", acessToken, { // 🔥 Nome corrigido
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          maxAge: 15 * 60 * 1000,
+      });
+
+      res.json({ message: "Token refreshed successfully" });
+  } catch (error) {
+      console.log("Error in refreshToken controller:", error.message);
+      res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 
 export const getProfile = async (req, res) => {
 	try {
