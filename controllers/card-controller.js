@@ -1,13 +1,13 @@
-import Gig from "../models/card-model.js";
+import Card from "../models/card-model.js";
+import User from "../models/user-model.js";
 import createError from "../utils/create-error.js";
-import cloudinary from "../lib/cloudinary.js"; // Importando o Cloudinary
-import { redis } from "../lib/redis.js"; // Importando o Redis
+import cloudinary from "../lib/cloudinary.js";
+import { redis } from "../lib/redis.js";
 import jwt from "jsonwebtoken"; 
 
 // Função para verificar se o usuário é um vendedor
 const verifySeller = async (req) => {
   const acessToken = req.cookies.acessToken;
-
   if (!acessToken) {
     throw new Error("No access token provided");
   }
@@ -17,51 +17,99 @@ const verifySeller = async (req) => {
     const user = await User.findById(decoded.userId);
 
     if (!user || !user.isSeller) {
-      throw new Error("Only sellers can create a gig!");
+      throw new Error("Only sellers can create a card");
     }
 
-    req.userId = decoded.userId; // Adiciona o userId ao objeto da requisição
-    return user; // Retorna o usuário para acessar outras informações, se necessário
+    req.userId = decoded.userId;
+    return user;
   } catch (error) {
     throw new Error("Unauthorized: Invalid or expired token");
   }
 };
 
-export const createGig = async (req, res, next) => {
+// Função para atualizar o cache do Redis ao criar um novo card
+async function updateCardsCache(newCard) {
   try {
-    // Verifica se o usuário é um seller
+    let cachedCards = await redis.get("cards_cache");
+
+    if (cachedCards) {
+      cachedCards = JSON.parse(cachedCards);
+      cachedCards.unshift(newCard);
+
+      // Limita o cache a um número máximo de cards, por exemplo, 50
+      if (cachedCards.length > 50) {
+        cachedCards.pop();
+      }
+    } else {
+      cachedCards = [newCard];
+    }
+
+    await redis.set("cards_cache", JSON.stringify(cachedCards));
+  } catch (error) {
+    console.log("Erro ao atualizar cache do Redis:", error);
+  }
+}
+
+// Criar um novo Card
+export const createCard = async (req, res, next) => {
+  try {
     const user = await verifySeller(req);
 
-    let cloudinaryResponse = null;
+    let cloudinaryCoverResponse = null;
+    let cloudinaryVideoResponses = [];
 
     if (req.body.cover) {
       try {
-        cloudinaryResponse = await cloudinary.uploader.upload(req.body.cover, {
-          folder: "gigs", // Pasta onde a imagem será armazenada
+        cloudinaryCoverResponse = await cloudinary.uploader.upload(req.body.cover, {
+          folder: "cards",
         });
       } catch (error) {
-        return next(createError(500, "Error uploading image to Cloudinary"));
+        return next(createError(500, "Error uploading cover image to Cloudinary"));
       }
     }
 
-    const newGig = new Gig({
+    if (req.body.video && Array.isArray(req.body.video)) {
+      try {
+        for (const video of req.body.video) {
+          const videoResponse = await cloudinary.uploader.upload(video.url, {
+            resource_type: "video",
+            folder: "cards/videos",
+          });
+
+          cloudinaryVideoResponses.push({
+            url: videoResponse.secure_url,
+            description: video.description || "",
+          });
+        }
+      } catch (error) {
+        return next(createError(500, "Error uploading videos to Cloudinary"));
+      }
+    }
+
+    const coverImage = cloudinaryCoverResponse
+      ? cloudinaryCoverResponse.secure_url
+      : user.profilePic;
+
+    const newCard = new Card({
       userId: req.userId,
       ...req.body,
-      cover: cloudinaryResponse ? cloudinaryResponse.secure_url : "", // Salvando a URL da imagem
+      cover: coverImage,
+      video: cloudinaryVideoResponses,
     });
 
-    try {
-      const savedGig = await newGig.save();
-      res.status(201).json(savedGig);
-    } catch (err) {
-      next(err);
-    }
+    const savedCard = await newCard.save();
+
+    // Atualiza o cache do Redis com o novo card
+    await updateCardsCache(savedCard);
+
+    res.status(201).json(savedCard);
   } catch (error) {
     res.status(403).json({ message: error.message });
   }
 };
 
-export const deleteGig = async (req, res, next) => {
+// Deletar um Card
+export const deleteCard = async (req, res, next) => {
   try {
     const acessToken = req.cookies.acessToken;
 
@@ -70,45 +118,53 @@ export const deleteGig = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(acessToken, process.env.ACESS_TOKEN_SCT);
-    const gig = await Gig.findById(req.params.id);
+    const card = await Card.findById(req.params.id);
 
-    if (!gig) {
-      return next(createError(404, "Gig not found"));
+    if (!card) {
+      return next(createError(404, "Card not found"));
     }
 
-    if (gig.userId.toString() !== decoded.userId.toString()) {
-      return next(createError(403, "You can delete only your gig!"));
+    if (card.userId.toString() !== decoded.userId.toString()) {
+      return next(createError(403, "You can delete only your card"));
     }
 
-    if (gig.cover) {
-      const publicId = gig.cover.split("/").pop().split(".")[0];
+    if (card.cover) {
+      const publicId = card.cover.split("/").pop().split(".")[0];
       try {
-        await cloudinary.uploader.destroy(`gigs/${publicId}`);
+        await cloudinary.uploader.destroy(`cards/${publicId}`);
         console.log("Deleted image from Cloudinary");
       } catch (error) {
         console.log("Error deleting image from Cloudinary", error);
       }
     }
 
-    await Gig.findByIdAndDelete(req.params.id);
-    await updateFeaturedGigsCache(); // Atualiza o cache do Redis
-    res.status(200).send("Gig has been deleted!");
+    await Card.findByIdAndDelete(req.params.id);
+    await updateFeaturedCardsCache();
+    res.status(200).send("Card has been deleted");
   } catch (error) {
     res.status(403).json({ message: error.message });
   }
 };
 
-export const getGig = async (req, res, next) => {
+// Buscar um Card pelo ID
+export const getCard = async (req, res, next) => {
   try {
-    const gig = await Gig.findById(req.params.id);
-    if (!gig) return next(createError(404, "Gig not found"));
-    res.status(200).send(gig);
+    const card = await Card.findById(req.params.id);
+    if (!card) return next(createError(404, "Card not found"));
+
+    const cardWithCover = {
+      ...card.toObject(),
+      cover: card.cover || card.userId.profilePic,
+    };
+
+    res.status(200).json(cardWithCover);
   } catch (err) {
     next(err);
   }
 };
 
-export const getGigs = async (req, res, next) => {
+// Buscar todos os Cards
+export const getCards = async (req, res, next) => {
   const q = req.query;
   const filters = {
     ...(q.userId && { userId: q.userId }),
@@ -123,47 +179,48 @@ export const getGigs = async (req, res, next) => {
   };
 
   try {
-    let gigs = await redis.get("gigs_cache"); // Tenta pegar do Redis
-    if (gigs) {
-      return res.status(200).json(JSON.parse(gigs)); // Se existir no cache, retorna diretamente
+    let cards = await redis.get("cards_cache");
+    if (cards) {
+      return res.status(200).json(JSON.parse(cards));
     }
 
-    gigs = await Gig.find(filters).sort({ [q.sort]: -1 });
-    await redis.set("gigs_cache", JSON.stringify(gigs)); // Armazena no Redis
-    res.status(200).send(gigs);
+    cards = await Card.find(filters).sort({ [q.sort]: -1 });
+    await redis.set("cards_cache", JSON.stringify(cards));
+    res.status(200).send(cards);
   } catch (err) {
     next(err);
   }
 };
 
-export const getGigsByCategory = async (req, res, next) => {
+// Buscar Cards por Categoria
+export const getCardsByCategory = async (req, res, next) => {
   const { category } = req.params;
 
   try {
-    let gigs = await redis.get(`gigs_category_${category}`); // Tenta pegar do Redis
-    if (gigs) {
-      return res.status(200).json(JSON.parse(gigs)); // Se existir no cache, retorna diretamente
+    let cards = await redis.get(`cards_category_${category}`);
+    if (cards) {
+      return res.status(200).json(JSON.parse(cards));
     }
 
-    gigs = await Gig.find({ category }).sort({ createdAt: -1 });
-    if (!gigs) {
-      return next(createError(404, "No gigs found for this category"));
+    cards = await Card.find({ category }).sort({ createdAt: -1 });
+    if (!cards) {
+      return next(createError(404, "No cards found for this category"));
     }
 
-    await redis.set(`gigs_category_${category}`, JSON.stringify(gigs)); // Armazena no Redis
-    res.status(200).json(gigs);
+    await redis.set(`cards_category_${category}`, JSON.stringify(cards));
+    res.status(200).json(cards);
   } catch (error) {
-    console.log("Error in getGigsByCategory controller", error.message);
+    console.log("Error in getCardsByCategory controller", error.message);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Função para atualizar o cache de Gigs em destaque
-async function updateFeaturedGigsCache() {
+// Atualiza o cache de Cards em destaque
+async function updateFeaturedCardsCache() {
   try {
-    const featuredGigs = await Gig.find({ isFeatured: true }).lean();
-    await redis.set("featured_gigs", JSON.stringify(featuredGigs)); // Atualiza o cache no Redis
+    const featuredCards = await Card.find({ isFeatured: true }).lean();
+    await redis.set("featured_cards", JSON.stringify(featuredCards));
   } catch (error) {
-    console.log("Error in updating featured gigs cache", error);
+    console.log("Error in updating featured cards cache", error);
   }
 }

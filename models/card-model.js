@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 const { Schema } = mongoose;
 
-const GigSchema = new Schema(
+const CardSchema = new Schema(
   {
     userId: {
       type: String,
@@ -45,21 +45,29 @@ const GigSchema = new Schema(
     },
     lang: {
       type: String,
-      required: true, 
+      required: true,
     },
     country: {
       type: String,
-      required: true, 
-    },
-    role: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref:"User",
       required: true,
     },
+    role: {
+      type: String,
+      required: true,
+    },
+    // Novo campo para vídeos
+    video: [
+      {
+        url: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
   },
   {
     timestamps: true,
   }
 );
 
-export default mongoose.model("Gig", GigSchema);
+export default mongoose.model("Card", CardSchema);
