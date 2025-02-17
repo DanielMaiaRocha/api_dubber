@@ -32,7 +32,7 @@ const setCookies = (res, acessToken, refreshToken) => {
   const cookieOptions = {
     httpOnly: true, // Prevenção contra ataques XSS
     secure: process.env.NODE_ENV === "production", // Apenas HTTPS em produção
-    sameSite: "lax", // Prevenção contra CSRF
+    sameSite: "none", // Prevenção contra CSRF
     path: "/", // Disponível em toda a aplicação
   };
 
