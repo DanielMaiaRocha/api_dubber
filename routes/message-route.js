@@ -8,7 +8,7 @@ import { protectRoute } from "../middleware/jwt.js";
 
 const router = express.Router();
 
-router.post("/", protectRoute, createMessage);
+router.post("/:id", protectRoute, createMessage);
 router.get("/:id", protectRoute, getMessages);
 
 export default router;
