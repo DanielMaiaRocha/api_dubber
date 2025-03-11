@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import bcrypt from "bcrypt"
+import bcrypt from "bcrypt";
 
 const { Schema } = mongoose;
 
@@ -25,9 +25,14 @@ const userSchema = new Schema(
       type: Boolean, 
       default: false
     },
+    sellerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: function () {
+        return this.isSeller ? new mongoose.Types.ObjectId() : null;
+      },
+    },
     lang: { 
       type: String, 
-      
     },
     country: { 
       type: String, 

@@ -3,35 +3,27 @@ const { Schema } = mongoose;
 
 const ConversationSchema = new Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    sellerId: {
-      type: String,
-      required: true,
-    },
-    buyerId: {
-      type: String,
-      required: true,
-    },
-    readBySeller: {
-      type: Boolean,
-      required: true,
-    },
-    readByBuyer: {
-      type: Boolean,
-      required: true,
-    },
+    participants: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+    ],
     lastMessage: {
       type: String,
-      required: false,
+      default: "",
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 export default mongoose.model("Conversation", ConversationSchema);

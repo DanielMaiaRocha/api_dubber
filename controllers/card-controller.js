@@ -3,7 +3,7 @@ import User from "../models/user-model.js";
 import createError from "../utils/create-error.js";
 import cloudinary from "../lib/cloudinary.js";
 import { redis } from "../lib/redis.js";
-import jwt from "jsonwebtoken"; 
+import jwt from "jsonwebtoken";
 
 // Função para verificar se o usuário é um vendedor
 const verifySeller = async (req) => {
@@ -60,11 +60,16 @@ export const createCard = async (req, res, next) => {
 
     if (req.body.cover) {
       try {
-        cloudinaryCoverResponse = await cloudinary.uploader.upload(req.body.cover, {
-          folder: "cards",
-        });
+        cloudinaryCoverResponse = await cloudinary.uploader.upload(
+          req.body.cover,
+          {
+            folder: "cards",
+          }
+        );
       } catch (error) {
-        return next(createError(500, "Error uploading cover image to Cloudinary"));
+        return next(
+          createError(500, "Error uploading cover image to Cloudinary")
+        );
       }
     }
 
@@ -224,3 +229,38 @@ async function updateFeaturedCardsCache() {
     console.log("Error in updating featured cards cache", error);
   }
 }
+
+export const getUserCard = async (req, res, next) => {
+  try {
+    const accessToken = req.cookies.accessToken;
+    if (!accessToken) {
+      return next(createError(401, "No access token provided"));
+    }
+
+    const decoded = jwt.verify(accessToken, process.env.ACESS_TOKEN_SCT);
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return next(createError(404, "User not found"));
+    }
+
+    const card = await Card.findOne({ userId: user._id });
+    if (!card) {
+      return next(createError(404, "Card not found"));
+    }
+
+    const cardData = {
+      role: card.role || "",
+      shortDesc: card.shortDesc || "",
+      desc: card.desc || "",
+      price: card.price || "",
+      country: user.country,
+      lang: user.lang,
+      profileImage: user.profilePic || "",
+      name: user.name,
+    };
+
+    res.status(200).json(cardData);
+  } catch (error) {
+    next(error);
+  }
+};

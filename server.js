@@ -11,10 +11,12 @@ import authRoute from "./routes/auth-route.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 
-const app = express();
 dotenv.config();
 mongoose.set("strictQuery", true);
 
+const app = express();
+
+// Conectar ao MongoDB
 const connect = async () => {
   try {
     await mongoose.connect(process.env.MONGO);
@@ -25,9 +27,9 @@ const connect = async () => {
 };
 
 // Configuração do CORS
-app.use(cors({ origin: "https://dubber-nine.vercel.app", credentials: true }));
+app.use(cors({ origin: "https://dubber-nine.vercel.app/", credentials: true }));
 
-// Aumentar limite de requisição para suportar arquivos grandes
+// Middleware para requisições grandes
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ limit: "100mb", extended: true }));
 

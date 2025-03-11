@@ -3,7 +3,8 @@ import {
   createCard,
   deleteCard,
   getCard,
-  getCards
+  getCards,
+  getUserCard
 } from "../controllers/card-controller.js";
 import { protectRoute } from "../middleware/jwt.js";
 
@@ -13,5 +14,6 @@ router.post("/", protectRoute, createCard);
 router.delete("/:id", protectRoute, deleteCard);
 router.get("/:id", getCard);
 router.get("/", getCards);
+router.get("/user-card", protectRoute, getUserCard); 
 
 export default router;

@@ -45,7 +45,7 @@ const setCookies = (res, acessToken, refreshToken) => {
   // Define o cookie do refresh token (expira em 7 dias)
   res.cookie("refreshToken", refreshToken, {
     ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
   });
 
   console.log("Cookies definidos com sucesso!");
@@ -69,10 +69,10 @@ export const signup = async (req, res) => {
     res.status(201).json({
       user: {
         _id: user._id,
-        name: user.name,
+        name: user.name, 
         email: user.email,
         isSeller: user.isSeller,
-        country: user.country,
+        country: user.country, 
         lang: user.lang
       },
     
@@ -121,6 +121,7 @@ export const logout = async (req, res) => {
     res.clearCookie("acessToken");
     res.clearCookie("refreshToken");
     res.json({ message: "Logged out successfully" });
+
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -130,7 +131,7 @@ export const refreshToken = async (req, res) => {
   try {
       const refreshToken = req.cookies.refreshToken;
       console.log("Refresh Token recebido:", refreshToken); // Log para debug
-
+``
       if (!refreshToken) {
           return res.status(401).json({ message: "No refresh token provided" });
       }
@@ -152,7 +153,7 @@ export const refreshToken = async (req, res) => {
       res.cookie("acessToken", acessToken, { //  Nome corrigido
           httpOnly: true,
           secure: true, //  Garante que só será enviado em HTTPS
-          sameSite: "None", //  Necessário para cookies em domínios diferentes (CORS)
+          sameSite: "none", //  Necessário para cookies em domínios diferentes (CORS)
           maxAge: 15 * 60 * 1000,
       });
 

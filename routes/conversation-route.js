@@ -1,18 +1,28 @@
 import express from "express";
 import {
-  createConversation,
-  getConversations,
-  getSingleConversation,
-  updateConversation,
+  createChat,
+  getChats,
+  createMessage,
+  getMessages,
+  setupSSE, // Nova função para SSE
 } from "../controllers/conversation-controller.js";
 import { protectRoute } from "../middleware/jwt.js";
 
-
 const router = express.Router();
 
-router.get("/", protectRoute, getConversations);
-router.post("/", protectRoute, createConversation);
-router.get("/single/:id", protectRoute, getSingleConversation);
-router.put("/:id", protectRoute, updateConversation);
+// Criar um novo chat
+router.post("/chat", protectRoute ,createChat);
+
+// Obter todos os chats do usuário
+router.get("/chats", protectRoute, getChats);
+
+// Obter mensagens de um chat específico
+router.get("/messages/:conversationId", protectRoute, getMessages);
+
+// Enviar uma nova mensagem
+router.post("/message", protectRoute, createMessage);
+
+// Rota para Server-Sent Events (SSE)
+router.get("/sse", protectRoute, setupSSE);
 
 export default router;
