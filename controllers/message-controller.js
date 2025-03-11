@@ -5,18 +5,19 @@ import Conversation from "../models/conversation-model.js";
 export const createMessage = async (req, res, next) => {
   const newMessage = new Message({
     conversationId: req.body.conversationId,
-    userId: req.userId,
-    desc: req.body.desc,
+    userId: req.userId, // Obtido do token JWT
+    text: req.body.text, // Usar "text" conforme o modelo
   });
+
   try {
     const savedMessage = await newMessage.save();
+
+    // Atualizar a conversa com a última mensagem
     await Conversation.findOneAndUpdate(
       { id: req.body.conversationId },
       {
         $set: {
-          readBySeller: req.isSeller,
-          readByBuyer: !req.isSeller,
-          lastMessage: req.body.desc,
+          lastMessage: req.body.text, // Atualiza apenas a última mensagem
         },
       },
       { new: true }
@@ -27,6 +28,7 @@ export const createMessage = async (req, res, next) => {
     next(err);
   }
 };
+
 export const getMessages = async (req, res, next) => {
   try {
     const messages = await Message.find({ conversationId: req.params.id });
