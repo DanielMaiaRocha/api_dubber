@@ -171,3 +171,45 @@ export const createMessage = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+export const getChatDetails = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    // Verifica se o ID da conversa é válido
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ message: "Invalid conversation ID" });
+    }
+
+    // Busca a conversa pelo ID
+    const conversation = await Conversation.findById(conversationId)
+      .populate("participants", "name profilePic") // Popula os participantes com nome e foto de perfil
+      .lean();
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    // Busca a última mensagem da conversa
+    const lastMessage = await Message.findOne({ conversationId })
+      .sort({ createdAt: -1 }) // Ordena pela data de criação (última mensagem primeiro)
+      .lean();
+
+    // Encontra o outro participante da conversa
+    const otherParticipant = conversation.participants.find(
+      (participant) => participant._id.toString() !== req.user._id.toString()
+    );
+
+    // Retorna os detalhes do chat
+    res.status(200).json({
+      otherParticipant: {
+        name: otherParticipant?.name || "Usuário Desconhecido",
+        profilePic: otherParticipant?.profilePic || "/images/default-avatar.png",
+      },
+      lastMessage: lastMessage?.text || "Nenhuma mensagem ainda",
+      lastMessageDate: lastMessage?.createdAt || "Indisponível",
+    });
+  } catch (error) {
+    console.error("Error fetching chat details:", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
