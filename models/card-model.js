@@ -4,7 +4,8 @@ const { Schema } = mongoose;
 const CardSchema = new Schema(
   {
     userId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User", 
       required: true,
     },
     title: {
@@ -55,15 +56,10 @@ const CardSchema = new Schema(
       type: String,
       required: true,
     },
-    // Novo campo para vídeos
-    video: [
-      {
-        url: {
-          type: String,
-          required: true,
-        },
-      },
-    ],
+    video: {
+      type: String,  // Agora é uma string simples como a cover
+      required: false,
+    },
   },
   {
     timestamps: true,

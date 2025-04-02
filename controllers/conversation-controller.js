@@ -2,214 +2,208 @@ import Conversation from "../models/conversation-model.js";
 import Message from "../models/message-model.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import { io } from "../server.js";
 
-// Armazena conexões SSE por conversa
-const sseConnections = new Map();
-
-// Enviar atualizações via SSE
-const sendSSEUpdate = (conversationId, data) => {
-  const clients = sseConnections.get(conversationId) || [];
-  if (clients.length > 0) {
-    clients.forEach((res) => res.write(`data: ${JSON.stringify(data)}\n\n`));
-  }
+// --- Funções Auxiliares --- //
+const emitNewMessage = (conversationId, message) => {
+  io.to(conversationId).emit("newMessage", message);
 };
 
-// Configurar conexão SSE
-export const setupSSE = (req, res) => {
-  const { conversationId } = req.query;
-
-  if (!conversationId) {
-    return res.status(400).json({ message: "Conversation ID is required" });
-  }
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  if (!sseConnections.has(conversationId)) {
-    sseConnections.set(conversationId, []);
-  }
-  sseConnections.get(conversationId).push(res);
-
-  req.on("close", () => {
-    const clients = sseConnections.get(conversationId) || [];
-    sseConnections.set(
-      conversationId,
-      clients.filter((client) => client !== res)
-    );
-    if (sseConnections.get(conversationId).length === 0) {
-      sseConnections.delete(conversationId);
-    }
-  });
+const emitConversationUpdate = (conversationId, updateData) => {
+  io.to(conversationId).emit("conversationUpdated", updateData);
 };
 
-// Criar um novo chat entre dois usuários
+// --- Controllers --- //
 export const createChat = async (req, res) => {
   try {
+    // Verificação de autenticação
     const token = req.cookies.acessToken;
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
 
     const decoded = jwt.verify(token, process.env.ACESS_TOKEN_SCT);
-    const { participant } = req.body; // O ID do outro usuário
+    const { participant } = req.body;
 
+    // Validações básicas
     if (!participant) {
-      return res.status(400).json({ message: "Participant is required" });
+      return res.status(400).json({ message: "Participante é obrigatório" });
     }
 
     if (!mongoose.Types.ObjectId.isValid(participant)) {
-      return res.status(400).json({ message: "Invalid participant ID" });
+      return res.status(400).json({ message: "ID do participante inválido" });
     }
 
     const userId = decoded.userId;
+    if (userId === participant) {
+      return res.status(400).json({ message: "Não pode criar chat consigo mesmo" });
+    }
 
-    // Verifica se já existe uma conversa entre os dois usuários
+    // Busca conversa existente (não verifica se o outro usuário existe)
     let chat = await Conversation.findOne({
-      participants: { $all: [userId, participant] },
+      $or: [
+        { participant1: userId, participant2: participant },
+        { participant1: participant, participant2: userId }
+      ]
     });
 
+    // Cria nova conversa se não existir
     if (!chat) {
       chat = new Conversation({
-        participants: [userId, participant], // Insere os dois IDs no array
+        participant1: userId,
+        participant2: participant,
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
+      
       await chat.save();
+      
+      // Popula dados básicos para a resposta
+      chat = await Conversation.findById(chat._id)
+        .populate('participant1', 'name profilePic')
+        .populate('participant2', 'name profilePic');
     }
 
     res.status(201).json(chat);
   } catch (error) {
-    console.error("Error creating chat", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error creating chat:", error);
+    res.status(500).json({ 
+      message: "Server error", 
+      error: error.message 
+    });
   }
 };
 
-// Obter todas as conversas do usuário pelo ID
 export const getChats = async (req, res) => {
   try {
     const token = req.cookies.acessToken;
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
 
     const decoded = jwt.verify(token, process.env.ACESS_TOKEN_SCT);
     const userId = decoded.userId;
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: "Invalid user ID" });
-    }
-
-    // Busca todas as conversas onde o usuário está presente no array participants
-    const chats = await Conversation.find({ participants: userId })
-      .populate("participants", "name email") // Popula os participantes do chat
+    // Busca todas as conversas do usuário
+    const chats = await Conversation.find({
+      $or: [{ participant1: userId }, { participant2: userId }]
+    })
+      .populate("participant1", "name profilePic")
+      .populate("participant2", "name profilePic")
       .sort({ updatedAt: -1 });
 
-    res.json(chats);
+    res.status(200).json(chats);
   } catch (error) {
-    console.error("Error fetching chats", error.message);
+    console.error("Error fetching chats:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Obter mensagens de uma conversa específica
 export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
-      return res.status(400).json({ message: "Invalid conversation ID" });
+      return res.status(400).json({ message: "ID da conversa inválido" });
     }
 
     const messages = await Message.find({ conversationId })
       .sort({ createdAt: 1 })
-      .populate("userId", "name email");
+      .populate("senderId", "name profilePic");
 
-    res.json(messages);
+    res.status(200).json(messages);
   } catch (error) {
-    console.error("Error fetching messages", error.message);
+    console.error("Error fetching messages:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Criar uma nova mensagem em uma conversa
 export const createMessage = async (req, res) => {
   try {
     const token = req.cookies.acessToken;
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
 
     const decoded = jwt.verify(token, process.env.ACESS_TOKEN_SCT);
     const { text, conversationId } = req.body;
 
     if (!text || !conversationId) {
-      return res.status(400).json({ message: "Message text and conversation ID are required" });
+      return res.status(400).json({ 
+        message: "Texto e ID da conversa são obrigatórios" 
+      });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
-      return res.status(400).json({ message: "Invalid conversation ID" });
-    }
-
+    // Cria e salva a mensagem
     const message = new Message({
-      userId: decoded.userId,
+      senderId: decoded.userId,
       conversationId,
       text,
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
+    
     await message.save();
 
-    // Atualizar última mensagem e data de atualização na conversa
-    await Conversation.findByIdAndUpdate(conversationId, {
-      lastMessage: text,
-      updatedAt: Date.now(),
-    });
+    // Atualiza a conversa
+    const updatedConversation = await Conversation.findByIdAndUpdate(
+      conversationId,
+      { 
+        lastMessage: text,
+        updatedAt: new Date() 
+      },
+      { new: true }
+    );
 
-    // Enviar atualização via SSE
-    sendSSEUpdate(conversationId, message);
+    // Notifica via WebSocket
+    emitNewMessage(conversationId, message);
+    emitConversationUpdate(conversationId, {
+      lastMessage: text,
+      updatedAt: updatedConversation.updatedAt
+    });
 
     res.status(201).json(message);
   } catch (error) {
-    console.error("Error creating message", error.message);
+    console.error("Error creating message:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 export const getChatDetails = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const token = req.cookies.acessToken;
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
 
-    // Verifica se o ID da conversa é válido
-    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
-      return res.status(400).json({ message: "Invalid conversation ID" });
-    }
+    const decoded = jwt.verify(token, process.env.ACESS_TOKEN_SCT);
+    const userId = decoded.userId;
 
-    // Busca a conversa pelo ID
+    // Busca a conversa
     const conversation = await Conversation.findById(conversationId)
-      .populate("participants", "name profilePic") // Popula os participantes com nome e foto de perfil
+      .populate("participant1", "name profilePic")
+      .populate("participant2", "name profilePic")
       .lean();
 
     if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
+      return res.status(404).json({ message: "Conversa não encontrada" });
     }
 
-    // Busca a última mensagem da conversa
+    // Identifica o outro participante
+    const otherParticipant = 
+      conversation.participant1._id.toString() === userId 
+        ? conversation.participant2 
+        : conversation.participant1;
+
+    // Busca a última mensagem
     const lastMessage = await Message.findOne({ conversationId })
-      .sort({ createdAt: -1 }) // Ordena pela data de criação (última mensagem primeiro)
+      .sort({ createdAt: -1 })
       .lean();
 
-    // Encontra o outro participante da conversa
-    const otherParticipant = conversation.participants.find(
-      (participant) => participant._id.toString() !== req.user._id.toString()
-    );
-
-    // Retorna os detalhes do chat
     res.status(200).json({
       otherParticipant: {
-        name: otherParticipant?.name || "Usuário Desconhecido",
-        profilePic: otherParticipant?.profilePic || "/images/default-avatar.png",
+        _id: otherParticipant._id,
+        name: otherParticipant.name,
+        profilePic: otherParticipant.profilePic
       },
       lastMessage: lastMessage?.text || "Nenhuma mensagem ainda",
-      lastMessageDate: lastMessage?.createdAt || "Indisponível",
+      lastMessageDate: lastMessage?.createdAt || null
     });
   } catch (error) {
-    console.error("Error fetching chat details:", error.message);
+    console.error("Error fetching chat details:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

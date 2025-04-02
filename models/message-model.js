@@ -4,21 +4,26 @@ const { Schema } = mongoose;
 const MessageSchema = new Schema(
   {
     conversationId: {
-      type: mongoose.Schema.Types.ObjectId, // Referência à collection Conversation
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Conversation",
       required: true,
+      index: true,
     },
-    userId: {
-      type: mongoose.Schema.Types.ObjectId, // Referência à collection User
+    senderId: {  // Renomeado de 'userId' para clarificar o remetente
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
     text: {
-      type: String, // Renomeado para "text" para maior clareza
+      type: String,
       required: true,
     },
+    read: {
+      type: Boolean,
+      default: false,
+    },
   },
-  { timestamps: true } // Adiciona createdAt e updatedAt automaticamente
+  { timestamps: true }
 );
 
 export default mongoose.model("Message", MessageSchema);

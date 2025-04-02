@@ -1,6 +1,8 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import { createServer } from "http"; // Importe createServer do http
+import { Server } from "socket.io"; // Importe Server do socket.io
 import userRoute from "./routes/user-route.js";
 import cardRoute from "./routes/card-route.js";
 import bookingRoute from "./routes/booking-route.js";
@@ -14,9 +16,18 @@ import cors from "cors";
 dotenv.config();
 mongoose.set("strictQuery", true);
 
+// --- Configuração do Express e Socket.io --- //
 const app = express();
+const httpServer = createServer(app); // Crie um servidor HTTP a partir do Express
+const io = new Server(httpServer, {
+  // Inicialize o Socket.io
+  cors: {
+    origin: "http://localhost:5173", // Permita conexões do frontend
+    credentials: true,
+  },
+});
 
-// Conectar ao MongoDB
+// --- Conexão com o MongoDB --- //
 const connect = async () => {
   try {
     await mongoose.connect(process.env.MONGO);
@@ -26,16 +37,13 @@ const connect = async () => {
   }
 };
 
-// Configuração do CORS
-app.use(cors({ origin: "https://dubber-nine.vercel.app", credentials: true }));
-
-// Middleware para requisições grandes
+// --- Middlewares --- //
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ limit: "100mb", extended: true }));
-
 app.use(cookieParser());
 
-// Definição das rotas
+// --- Rotas --- //
 app.use("/api/auth", authRoute);
 app.use("/api/users", userRoute);
 app.use("/api/cards", cardRoute);
@@ -44,16 +52,44 @@ app.use("/api/conversations", conversationRoute);
 app.use("/api/messages", messageRoute);
 app.use("/api/reviews", reviewRoute);
 
-// Middleware de erro global
+// --- Lógica do WebSocket --- //
+io.on("connection", (socket) => {
+  console.log("Novo cliente conectado:", socket.id);
+
+  // Entrar em uma sala de conversa específica
+  socket.on("joinConversation", (conversationId) => {
+    socket.join(conversationId);
+    console.log(`Cliente ${socket.id} entrou na sala: ${conversationId}`);
+  });
+
+  // Sair de uma sala
+  socket.on("leaveConversation", (conversationId) => {
+    socket.leave(conversationId);
+    console.log(`Cliente ${socket.id} saiu da sala: ${conversationId}`);
+  });
+
+  // Lidar com desconexão
+  socket.on("disconnect", () => {
+    console.log("Cliente desconectado:", socket.id);
+  });
+});
+
+// Exporte o `io` para uso nos controllers
+export { io };
+
+// --- Middleware de Erro Global --- //
 app.use((err, req, res, next) => {
   const errorStatus = err.status || 500;
   const errorMessage = err.message || "Something went wrong!";
   console.error("Error:", errorMessage);
-  return res.status(errorStatus).json({ success: false, message: errorMessage });
+  return res
+    .status(errorStatus)
+    .json({ success: false, message: errorMessage });
 });
 
-// Iniciar servidor
-app.listen(8800, () => {
+// --- Iniciar Servidor --- //
+httpServer.listen(8800, () => {
+  // Use httpServer em vez de app.listen()
   connect();
   console.log("Backend server is running on port 8800!");
 });
