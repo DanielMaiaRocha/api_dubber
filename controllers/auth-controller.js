@@ -32,7 +32,7 @@ const setCookies = (res, acessToken, refreshToken) => {
   const cookieOptions = {
     httpOnly: true, // Prevenção contra ataques XSS
     secure: process.env.NODE_ENV === "production", // Apenas HTTPS em produção
-    sameSite: "strict", // Prevenção contra CSRF
+    sameSite: "none", // Prevenção contra CSRF
     path: "/", // Disponível em toda a aplicação
   };
 
@@ -153,7 +153,7 @@ export const refreshToken = async (req, res) => {
       res.cookie("acessToken", acessToken, { //  Nome corrigido
           httpOnly: true,
           secure: true, //  Garante que só será enviado em HTTPS
-          sameSite: "strict", //  Necessário para cookies em domínios diferentes (CORS)
+          sameSite: "none", //  Necessário para cookies em domínios diferentes (CORS)
           maxAge: 15 * 60 * 1000,
       });
 
