@@ -71,11 +71,16 @@ export const createCard = async (req, res, next) => {
     const user = await verifySeller(req);
     
     // Validação dos campos obrigatórios
-    const requiredFields = ['title', 'role', 'shortDesc', 'desc', 'price', 'country', 'lang'];
+    const requiredFields = ['title', 'role', 'shortDesc', 'desc', 'price', 'country', 'lang', 'billingMethod'];
     const missingFields = requiredFields.filter(field => !req.body[field]);
     
     if (missingFields.length > 0) {
       throw createError(400, `Missing required fields: ${missingFields.join(', ')}`);
+    }
+
+    const validBillingMethod = ['hour', 'minute', 'loop'];
+    if (!validBillingMethod.includes(req.body.billingMethod)) {
+      throw (400, 'Invalid billing method')
     }
 
     // Processar a imagem de capa
@@ -125,7 +130,8 @@ export const createCard = async (req, res, next) => {
       revisionNumber: parseInt(req.body.revisionNumber) || 0,
       features: req.body.features || [],
       cover: coverUrl,
-      video: videoUrl  // Agora é uma string única
+      video: videoUrl, 
+      billingMethod: req.body.billingMethod
     });
 
     const savedCard = await newCard.save();
@@ -199,6 +205,15 @@ export const updateCard = async (req, res, next) => {
     // Verifica se o usuário é o dono do card
     if (existingCard.userId.toString() !== user._id.toString()) {
       throw createError(403, "Não autorizado - você só pode editar seus próprios cards");
+    }
+
+    // Validação do billingMethod se estiver sendo atualizado
+    if (req.body.billingMethod) {
+      const validBillingMethods = ['hour', 'minute', 'loop'];
+      if (!validBillingMethods.includes(req.body.billingMethod)) {
+        throw createError(400, 'Invalid billing method');
+      }
+      updateData.billingMethod = req.body.billingMethod;
     }
 
     const updateData = { ...req.body };

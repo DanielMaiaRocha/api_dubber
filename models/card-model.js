@@ -28,6 +28,11 @@ const CardSchema = new Schema(
       type: Number,
       required: true,
     },
+    billingMethod: {
+      type: String,
+      enum: ["hour", "minute", "loop"], 
+      required: true,
+    },
     cover: {
       type: String,
       required: true,
@@ -57,7 +62,7 @@ const CardSchema = new Schema(
       required: true,
     },
     video: {
-      type: String,  // Agora é uma string simples como a cover
+      type: String,
       required: false,
     },
   },
