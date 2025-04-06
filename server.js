@@ -22,7 +22,7 @@ const httpServer = createServer(app); // Crie um servidor HTTP a partir do Expre
 const io = new Server(httpServer, {
   // Inicialize o Socket.io
   cors: {
-    origin: "http://localhost:5173", // Permita conexões do frontend
+    origin: "https://dubber.work", // Permita conexões do frontend
     credentials: true,
   },
 });
@@ -38,7 +38,7 @@ const connect = async () => {
 };
 
 // --- Middlewares --- //
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: "https://dubber.work", credentials: true }));
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ limit: "100mb", extended: true }));
 app.use(cookieParser());
